@@ -4,15 +4,63 @@ using System.Linq;
 using Mobcast.Coffee.Toggles;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.Serialization;
 using Object = UnityEngine.Object;
 
 
 namespace Mobcast.Coffee.Toggles
 {
+	[Serializable]
+	public class CompositeToggleData
+	{
+		public GameObject go;
+		public int id;
+		public CompositeToggle toggle;
+	}
+
+	[Serializable]
+	public class CompositeToggleGroupActiveData
+	{
+		public GameObject gameObject;
+		public int stateValue;
+		public int count;
+		
+		private int[] stateValues;
+		private int cacheState = 0;
+		private int cacheCount = -1;
+		public int[] StateValues
+		{
+			get
+			{
+				if (cacheCount != count)
+				{
+					stateValues = new int[count];
+				}
+				cacheCount = count;
+				
+				if (cacheState == stateValue)
+				{
+					return stateValues;
+				}
+				stateValues = CompositeUtil.CalculationState(stateValue, count);
+				cacheState = stateValue;
+				return stateValues;
+			}
+		}
+
+		public CompositeToggleGroupActiveData(GameObject go, int count)
+		{
+			gameObject = go;
+			this.count = count;
+		}
+	}
+
 	/// <summary>
 	/// Composite toggle.
+	/// <see cref="https://www.fairygui.com/docs/editor/controller"/>
 	/// </summary>
 	[ExecuteInEditMode]
+	[AddComponentMenu("YIUI/控制器/复合开关 【CompositeToggle】")]
 	public class CompositeToggle : ParentChildRelatable<CompositeToggle>, ISerializationCallbackReceiver
 	{
 		static readonly List<Component> s_Components = new List<Component>();
@@ -32,6 +80,18 @@ namespace Mobcast.Coffee.Toggles
 			/// <summary>ビットマスク型.</summary>
 			Flag,
 		}
+		
+		public int m_UniqueId;
+		/// <summary>
+		/// 同一游戏物体内组件ID
+		/// </summary>
+		public int UniqueId
+		{
+			get
+			{
+				return m_UniqueId;
+			}
+		}
 
 		/// <summary>トグルの要素数を返します.</summary>
 		public virtual int count
@@ -45,6 +105,7 @@ namespace Mobcast.Coffee.Toggles
 		}
 
 		[SerializeField] int m_Count;
+		private int lastCount = 0;
 
 		/// <summary>トグル値変更イベント.</summary>
 		[System.Serializable]
@@ -70,6 +131,20 @@ namespace Mobcast.Coffee.Toggles
 		/// <value>The synced toggles.</value>
 		public List<CompositeToggle> syncedToggles { get { return m_SyncedToggles; } }
 		[SerializeField] List<CompositeToggle> m_SyncedToggles = new List<CompositeToggle>();
+		/// <summary>
+		/// 是否同步相同相同类型
+		/// </summary>
+		public bool isSyncedSameType = false;
+
+		/// <summary>
+		/// Gets the synced toggles.
+		/// </summary>
+		/// <value>The synced toggles.</value>
+		public List<CompositeToggle> syncedToggleObjects { get { return SyncedObjects; } }
+		[HideInInspector]
+		public List<CompositeToggle> SyncedObjects = new List<CompositeToggle>();
+		public List<CompositeToggleData> SyncedToggleDatas { get { return m_SyncedToggleDatas; } }
+		[SerializeField] List<CompositeToggleData> m_SyncedToggleDatas = new List<CompositeToggleData>();
 
 		/// <summary>
 		/// Gets the group parent.
@@ -99,12 +174,41 @@ namespace Mobcast.Coffee.Toggles
 		/// </summary>
 		[SerializeField]
 		List<GameObject> m_ActivateObjects = new List<GameObject>();
+		
+		/// <summary>
+		/// The m unactivate objects.
+		/// </summary>
+		[SerializeField]
+		List<GameObject> m_UnActivateObjects = new List<GameObject>();
+		
+		[SerializeField]
+		private List<CompositeToggleGroupActiveData> m_ExActiveDatas = new List<CompositeToggleGroupActiveData>();
+		
+		[HideInInspector]
+		public bool hasExActiveObjects;
+		
+		public List<CompositeToggleGroupActiveData> ExActiveDatas
+		{
+			get
+			{
+				return m_ExActiveDatas;
+			}
+		}
+
+		public void AddExActiveDatas(CompositeToggleGroupActiveData groupActiveData)
+		{
+			m_ExActiveDatas.Add(groupActiveData);
+		}
 
 		/// <summary>
 		/// The m comments.
 		/// </summary>
 		[SerializeField]
 		List<string> m_Comments = new List<string>();
+		public List<string> GetComments()
+		{
+			return m_Comments;
+		}
 
 		/// <summary>
 		/// The m actions.
@@ -116,6 +220,11 @@ namespace Mobcast.Coffee.Toggles
 		public OnValueChangeEvent onValueChanged{get {return m_OnValueChanged; }}
 		[SerializeField] OnValueChangeEvent m_OnValueChanged;
 
+		[HideInInspector]
+		public Action<CompositeToggle> onRefreshEvent;
+		
+		public List<CompositeToggleGroup> ReferenceExToggles = new List<CompositeToggleGroup>();
+		
 
 		//---- ▲ 公開/シリアライズ設定項目 ▲ ----
 
@@ -133,7 +242,89 @@ namespace Mobcast.Coffee.Toggles
 		{
 			Reflesh(true);
 		}
+		
+#if UNITY_EDITOR
+		private void OnValidate()
+		{
+			CompositeToggle[] toggles = GetComponents<CompositeToggle>();
+			Dictionary<int, bool> datas = new Dictionary<int, bool>();
+			for (int i = 0; i < toggles.Length; i++)
+			{
+				CompositeToggle toggle = toggles[i];
+				if (datas.TryGetValue(toggle.UniqueId, out bool value))
+				{
+					GameObject pnl = FindRootPnl(gameObject);
+					if (pnl != null)
+					{
+						Debug.LogWarning($"{pnl.name} 中的 {gameObject.name} CompositeToggle 组件 UniqueId 重复 {toggle.UniqueId}");
+					}
+					else
+					{
+						GameObject pcanvas = FindRoot(gameObject, true);
+						if (pcanvas != null)
+						{
+							Debug.LogWarning($"{pcanvas.name} 中的 {gameObject.name} CompositeToggle 组件 UniqueId 重复 {toggle.UniqueId}");	
+						}
+						else
+						{
+							Debug.LogWarning($"{FindRoot(gameObject).name} 中的 {gameObject.name} CompositeToggle 组件 UniqueId 重复 {toggle.UniqueId}");
+						}
+					}
+					//Debug.LogWarning($"{gameObject.name} 的 CompositeToggle 组件 UniqueId 重复 {toggle.UniqueId}");
+				}
+				else
+				{
+					datas[toggle.UniqueId] = true;
+				}
+			}
+		}
 
+		private GameObject FindRootPnl(GameObject go)
+		{
+			if (go.transform.parent != null)
+			{
+				if (!go.name.StartsWith("pnl_"))
+				{
+					return FindRootPnl(go.transform.parent.gameObject);	
+				}
+				else
+				{
+					return null;
+				}
+			}
+			else
+			{
+				return null;
+			}
+		}
+
+		private GameObject FindRoot(GameObject go, bool isCanvas = false)
+		{
+			if (go.transform.parent != null)
+			{
+				if (isCanvas)
+				{
+					if (go.GetComponent<Canvas>() == null)
+					{
+						return FindRoot(go.transform.parent.gameObject, isCanvas);	
+					}
+					else
+					{
+						return go;
+					}
+				}
+				else
+				{
+					return FindRoot(go.transform.parent.gameObject, isCanvas);
+				}
+			}
+			else
+			{
+				return go;
+			}
+		}
+#endif
+		
 		#endregion
 
 		//==== ▼ Unityコールバック ▼ ====
@@ -149,7 +340,35 @@ namespace Mobcast.Coffee.Toggles
 
 			forceNotifyNext = m_ResetValueOnAwake;
 			maskValue = maskValue;
+			
+#if UNITY_EDITOR
+			RefreshExToggles();
+#endif
 		}
+		
+#if UNITY_EDITOR
+
+		private void RefreshExToggles()
+		{
+			for (int i = ReferenceExToggles.Count -1; i >= 0; i--)
+			{
+				if (ReferenceExToggles[i]==null)
+				{
+					ReferenceExToggles.RemoveAt(i);
+				}
+				else
+				{
+					ReferenceExToggles[i].gameObject.SetActive(true);
+					ReferenceExToggles[i].Init();
+				}
+			}
+		}
+
+		private void OnEnable()
+		{
+			RefreshExToggles();
+		}
+#endif	
 
 		/// <summary>
 		/// Gets or sets a value indicating whether this <see cref="Mobcast.Coffee.Toggles.CompositeToggle"/> force notify next.
@@ -219,14 +438,53 @@ namespace Mobcast.Coffee.Toggles
 				{
 					var toggle = m_SyncedToggles[i];
 					if (toggle && toggle != this && !toggle.groupParent)
+						//toggle.maskValue = m_Value;
+					{
+						CompositeToggle[] toggles = toggle.GetComponents<CompositeToggle>();
+						for (int j = 0; j < toggles.Length; j++)
+						{
+							if (isSyncedSameType)
+							{
+								if (toggles[j].valueType == valueType)
+								{
+									toggles[j].maskValue = m_Value;	
+								}
+							}
+							else
+							{
+								toggles[j].maskValue = m_Value;	
+							}
+						}
+					}
+				}
+				
+				for (int i = 0; i < SyncedObjects.Count; i++)
+				{
+					var toggle = SyncedObjects[i];
+					if (toggle && toggle != this && !toggle.groupParent)
+						//toggle.maskValue = m_Value;
+					{
+						// CompositeToggle[] toggles = toggle.GetComponents<CompositeToggle>();
+						// for (int j = 0; j < toggles.Length; j++)
+						// {
+						// 	toggles[j].maskValue = m_Value;
+						// }
 						toggle.maskValue = m_Value;
+					}
 				}
 
 				for (int i = 0; i < children.Count; i++)
 				{
 					var toggle = children[i];
 					if (toggle && toggle != this && !toggle.ignoreParent && !toggle.groupParent)
-						toggle.maskValue = m_Value;
+						//toggle.maskValue = m_Value;
+					{
+						CompositeToggle[] toggles = toggle.GetComponents<CompositeToggle>();
+						for (int j = 0; j < toggles.Length; j++)
+						{
+							toggles[j].maskValue = m_Value;
+						}
+					}
 				}
 
 				hasLocked = false;
@@ -276,6 +534,7 @@ namespace Mobcast.Coffee.Toggles
 				toggle.ignoreParent = true;
 				toggle.m_ResetValueOnAwake = false;
 				toggle.m_SyncedToggles.Clear();
+				toggle.SyncedObjects.Clear();
 //				toggle.m_OnValueChanged = new OnValueChangeEvent();
 				toggle.SetParent(null);
 				toggle.groupParent = this;
@@ -291,12 +550,20 @@ namespace Mobcast.Coffee.Toggles
 			}
 
 			FitSize(m_ActivateObjects, 0 < m_ActivateObjects.Count ? count : 0, () => null);
+			FitSize(m_UnActivateObjects, 0 < m_UnActivateObjects.Count ? count : 0, () => null);
 			FitSize(m_Actions, 0 < m_Actions.Count ? count : 0, () => new UnityEvent());
 			FitSize(m_Comments, m_Count, () => "");
 
 #if UNITY_EDITOR
 			if (!inSerialization)
 				UnityEditor.EditorUtility.SetDirty(this);
+
+			if (lastCount != m_Count)
+			{
+				onRefreshEvent?.Invoke(this);	
+			}
+
+			lastCount = m_Count;
 #endif
 		}
 
@@ -360,7 +627,44 @@ namespace Mobcast.Coffee.Toggles
 				
 				if (i < m_ActivateObjects.Count && m_ActivateObjects[i])
 					m_ActivateObjects[i].SetActive(flag);
+				
+				if (i < m_UnActivateObjects.Count && m_UnActivateObjects[i])
+					m_UnActivateObjects[i].SetActive(!flag);
 			}
+
+			for (int i = 0; i < m_ExActiveDatas.Count; i++)
+			{
+				CompositeToggleGroupActiveData groupActiveData = m_ExActiveDatas[i];
+				switch (valueType)
+				{
+					case ValueType.Boolean:
+					{
+						if (indexValue < groupActiveData.StateValues.Length && groupActiveData.gameObject != null)
+						{
+							groupActiveData.gameObject.SetActive(groupActiveData.StateValues[indexValue] == 1);
+						}
+						break;
+					}
+					case ValueType.Index:
+					{
+						if (indexValue < groupActiveData.StateValues.Length && groupActiveData.gameObject != null)
+						{
+							groupActiveData.gameObject.SetActive(groupActiveData.StateValues[indexValue] == 1);
+						}
+						break;
+					}
+					case ValueType.Flag:
+					{
+						break;
+					}
+					case ValueType.Count:
+					{
+						break;
+					}
+				}
+			}
+			
+			
 
 			onValueChanged.Invoke(this);
 
@@ -429,5 +733,16 @@ namespace Mobcast.Coffee.Toggles
 
 		static int[] countingTailingZeroTable;
 
+		protected override void OnDestroy()
+		{
+			base.OnDestroy();
+
+#if UNITY_EDITOR
+			for (int i = ReferenceExToggles.Count -1; i >= 0; i--)
+			{
+				ReferenceExToggles[i].Remove(this);
+			}
+#endif
+		}
 	}
 }

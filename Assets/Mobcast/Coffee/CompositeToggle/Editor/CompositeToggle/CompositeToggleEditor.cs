@@ -7,8 +7,6 @@ using UnityEditorInternal;
 using UnityEngine;
 using Object = UnityEngine.Object;
 using System.Text;
-using Mobcast.Coffee.Toggles;
-
 
 namespace Mobcast.Coffee.Toggles
 {
@@ -28,6 +26,8 @@ namespace Mobcast.Coffee.Toggles
 		static GUIContent contentAction;
 		static GUIContent contentGroup;
 		static GUIContent contentActivation;
+		static GUIContent contentUnActivation;
+		static GUIContent contentActiveDatasVation;
 		static GUIContent contentOnValueChanged;
 		static GUIStyle styleTitle;
 		protected static GUIStyle styleHeader;
@@ -36,8 +36,6 @@ namespace Mobcast.Coffee.Toggles
 
 
 		static bool cached;
-
-//		static bool rec = false;
 
 
 		protected void CacheGUI()
@@ -50,10 +48,12 @@ namespace Mobcast.Coffee.Toggles
 			contentMinus = new GUIContent(string.Empty, EditorGUIUtility.FindTexture("Toolbar Minus"), "Remove Element");
 			contentHierarchy = new GUIContent(EditorGUIUtility.FindTexture("unityeditor.hierarchywindow"), "Auto-Construction based on children");
 
-			contentAction = new GUIContent("Invoke Action");
-			contentGroup = new GUIContent("Grouping Toggle");
-			contentActivation = new GUIContent("Activate GameObject");
-			contentOnValueChanged = new GUIContent("OnValueChanged (Persistent)");
+			contentAction = new GUIContent("每个选中事件监听");
+			contentGroup = new GUIContent("Toggle组");
+			contentActivation = new GUIContent("激活单个物体");
+			contentUnActivation = new GUIContent("隐藏单个物体");
+			contentActiveDatasVation = new GUIContent("激活\\隐藏列表");
+			contentOnValueChanged = new GUIContent("变更事件监听(持久的)");
 
 
 			styleTitle = new GUIStyle("GUIEditor.BreadcrumbLeft");
@@ -80,6 +80,8 @@ namespace Mobcast.Coffee.Toggles
 
 		//---- ▲ GUIキャッシュ ▲ ----
 		ReorderableList roSyncToggles;
+		ReorderableList roSyncToggleObjects;
+		ReorderableList roExActiveObjects;
 		CompositeToggle current;
 
 		//		MethodInfo miTransformParentChanged;
@@ -88,12 +90,16 @@ namespace Mobcast.Coffee.Toggles
 		SerializedProperty spActions;
 		SerializedProperty spGroupToggles;
 		SerializedProperty spActivations;
+		SerializedProperty spExActiveDatas;
+		SerializedProperty spUnActivations;
 		SerializedProperty spOnValueChanged;
 
 		SerializedProperty spValueType;
+		SerializedProperty spUniqueId;
 		SerializedProperty spIgnoreParentToggle;
 		SerializedProperty spResetValueOnAwake;
 		SerializedProperty spSyncedToggles;
+		SerializedProperty spSyncedToggleObjects;
 
 		static CompositeToggle[] allToggles;
 		static List<CompositeToggle> syncedByOtherToggles = new List<CompositeToggle>();
@@ -112,6 +118,94 @@ namespace Mobcast.Coffee.Toggles
 			};
 			roSyncToggles.elementHeight = 16;
 			roSyncToggles.headerHeight = 0;
+			
+			roSyncToggleObjects = new ReorderableList(serializedObject, serializedObject.FindProperty("m_SyncedToggleDatas"), true, true, true, true);
+			roSyncToggleObjects.drawHeaderCallback = (Rect rect) =>
+			{
+				rect.xMin += 14; // 忽略拖拽按钮的宽度
+
+				float x = rect.x;
+				float y = rect.y;
+				float height = rect.height;
+				float space = 8;
+				float remainingWidth = rect.width;
+				float contentWidth = Mathf.FloorToInt((remainingWidth - 40 - space * 4 - 30) / 3);
+				
+				Rect rect1 = new Rect(x, y, 40, height);
+				GUI.Label(rect1, "序号", EditorStyles.label);
+
+				x = x + 80 + space;
+				Rect rect2 = new Rect(x, y, contentWidth, height);
+				GUI.Label(rect2, "Toggle物体", EditorStyles.label);
+				
+				x = x + contentWidth + space;
+				Rect rect3 = new Rect(x, y, contentWidth, height);
+				GUI.Label(rect3, "Toggle唯一ID", EditorStyles.label);
+				
+				x = x + contentWidth + space; 
+				Rect rect4 = new Rect(x, y, contentWidth, height);
+				GUI.Label(rect4, "Toggle", EditorStyles.label);
+			};
+			roSyncToggleObjects.drawElementCallback = (rect, index, isActive, isFocus) =>
+			{
+				var objTitle = new GUIContent("");
+				var element = roSyncToggleObjects.serializedProperty.GetArrayElementAtIndex(index);
+				
+				float x = rect.x;
+				float y = rect.y;
+				float height = rect.height;
+				float space = 8;
+				float remainingWidth = rect.width;
+				float contentWidth = Mathf.FloorToInt((remainingWidth - 40 - space * 4 - 30) / 3);
+				
+				Rect rect1 = new Rect(x, y, 40, height);
+				GUI.Label(rect1, index.ToString());
+
+				x = x + 80 + space;
+				Rect rect2 = new Rect(x, y, contentWidth, height);
+				EditorGUI.PropertyField(rect2, element.FindPropertyRelative("go"), objTitle);
+				
+				x = x + contentWidth + space;
+				Rect rect3 = new Rect(x, y, contentWidth, height);
+				EditorGUI.PropertyField(rect3, element.FindPropertyRelative("id"), objTitle);
+				
+				GUI.enabled = false;
+				x = x + contentWidth + space; 
+				Rect rect4 = new Rect(x, y, contentWidth, height);
+				EditorGUI.PropertyField(rect4, element.FindPropertyRelative("toggle"), objTitle);
+				
+				int id = element.FindPropertyRelative("id").intValue;
+				Object goObject = element.FindPropertyRelative("go").objectReferenceValue;
+				if (goObject != null)
+				{
+					GameObject go = goObject as GameObject;
+					CompositeToggle[] toggles = go.GetComponents<CompositeToggle>();
+					bool isExist = false;
+					for (int i = 0; i < toggles.Length; i++)
+					{
+						if (toggles[i].UniqueId == id)
+						{
+							isExist = true;
+							element.FindPropertyRelative("toggle").objectReferenceValue = toggles[i];
+							break;
+						}
+					}
+
+					if (!isExist)
+					{
+						element.FindPropertyRelative("toggle").objectReferenceValue = null;
+					}
+				}
+				GUI.enabled = true;
+			};
+			roSyncToggleObjects.elementHeight = 16;
+			roSyncToggleObjects.headerHeight = 16;
+			
+			roExActiveObjects = new ReorderableList(serializedObject, serializedObject.FindProperty("m_ExActiveDatas"), true, true, true, true);
+			roExActiveObjects.drawHeaderCallback = HeaderCallback;
+			roExActiveObjects.drawElementCallback = ElementCallback;
+			roExActiveObjects.elementHeight = 16;
+			roExActiveObjects.headerHeight = 16;
 
 			current = target as CompositeToggle;
 			current.Reflesh();
@@ -120,12 +214,16 @@ namespace Mobcast.Coffee.Toggles
 			spActions = serializedObject.FindProperty("m_Actions");
 			spGroupToggles = serializedObject.FindProperty("m_GroupedToggles");
 			spActivations = serializedObject.FindProperty("m_ActivateObjects");
+			spExActiveDatas = serializedObject.FindProperty("m_ExActiveDatas");
+			spUnActivations = serializedObject.FindProperty("m_UnActivateObjects");
 			spOnValueChanged = serializedObject.FindProperty("m_OnValueChanged");
 
 			spValueType = serializedObject.FindProperty("m_ValueType");
+			spUniqueId = serializedObject.FindProperty("m_UniqueId");
 			spIgnoreParentToggle = serializedObject.FindProperty("m_IgnoreParent");
 			spResetValueOnAwake = serializedObject.FindProperty("m_ResetValueOnAwake");
 			spSyncedToggles = serializedObject.FindProperty("m_SyncedToggles");
+			spSyncedToggleObjects = serializedObject.FindProperty("m_SyncedToggleDatas");
 
 			s_AvailableReflectedTypes = new HashSet<Type>(current.GetComponents<Component>().Where(x => x != null).Select(x => x.GetType()));
 			s_AvailableReflectedTypes.Add(typeof(GameObject));
@@ -152,11 +250,18 @@ namespace Mobcast.Coffee.Toggles
 
 		void UpdateMultipleRelations()
 		{
+			current.SyncedObjects.Clear();
+			for (int i = 0; i < current.SyncedToggleDatas.Count; i++)
+			{
+				current.SyncedObjects.Add(current.SyncedToggleDatas[i].toggle);
+			}
+			
 			multipleRelations = new HashSet<CompositeToggle>(
 				current.children
 				.Concat(new []{current.parent})
 				.Concat(current.groupedToggles)
 				.Concat(current.syncedToggles)
+				//.Concat(current.syncedToggleObjects)
 //				.Concat(Enumerable.Range(0,spGroupToggles.arraySize).Select(i=>spGroupToggles.GetArrayElementAtIndex(i).objectReferenceValue as CompositeToggle))
 //				.Concat(Enumerable.Range(0,spSyncedToggles.arraySize).Select(i=>spSyncedToggles.GetArrayElementAtIndex(i).objectReferenceValue as CompositeToggle))
 				.Where(x => x)
@@ -188,6 +293,8 @@ namespace Mobcast.Coffee.Toggles
 
 			//トグルを全件表示します.
 			OnDrawToggles();
+			
+			DrawExActiveObjects();
 
 			//コールバック
 			if (current.onValueChanged.GetPersistentEventCount() != 0)
@@ -215,34 +322,60 @@ namespace Mobcast.Coffee.Toggles
 				spIgnoreParentToggle.boolValue = true;
 				spResetValueOnAwake.boolValue = false;
 				spSyncedToggles.ClearArray();
+				spSyncedToggleObjects.ClearArray();
 
 				if (serializedObject.ApplyModifiedProperties())
 					current.OnTransformParentChanged();
 				return;
 			}
-
+			
 			using (new EditorGUILayout.VerticalScope("box"))
 			{
 				//トグルタイプポップアップを描画します.
-				EditorGUILayout.PropertyField(spValueType);
-				EditorGUILayout.PropertyField(spIgnoreParentToggle);
-				EditorGUILayout.PropertyField(spResetValueOnAwake);
+				EditorGUILayout.PropertyField(spValueType, new GUIContent("控制类型"));
+				EditorGUILayout.PropertyField(spUniqueId, new GUIContent("唯一ID"));
+				EditorGUILayout.PropertyField(spIgnoreParentToggle, new GUIContent("忽略父节点影响"));
+				EditorGUILayout.PropertyField(spResetValueOnAwake, new GUIContent("启动重设值"));
 
 				//自分の値が変更されたときに通知するトグルリストを描画します.
+				EditorGUILayout.BeginHorizontal();
 				bool hasSyncToggles = 0 < roSyncToggles.count;
-				if (EditorGUILayout.Toggle("Sync Other Toggles", hasSyncToggles) != hasSyncToggles)
+				if (EditorGUILayout.Toggle("同步到其它控制器(目标所有)", hasSyncToggles) != hasSyncToggles)
 				{
 					hasSyncToggles = !hasSyncToggles;
 					if (hasSyncToggles)
+					{
 						roSyncToggles.serializedProperty.InsertArrayElementAtIndex(0);
+					}
 					else
 						roSyncToggles.serializedProperty.ClearArray();
 				}
+				if (hasSyncToggles)
+				{
+					current.isSyncedSameType = EditorGUILayout.Toggle("只同步相同类型", current.isSyncedSameType);	
+				}
+				EditorGUILayout.EndHorizontal();
 
 				if (hasSyncToggles)
 				{
-					GUILayout.Space(-2);
+					//GUILayout.Space(-2);
 					roSyncToggles.DoLayoutList();
+				}
+				
+				bool hasSyncToggleObjects = 0 < roSyncToggleObjects.count;
+				if (EditorGUILayout.Toggle("同步到其它控制器(ID查询)", hasSyncToggleObjects) != hasSyncToggleObjects)
+				{
+					hasSyncToggleObjects = !hasSyncToggleObjects;
+					if (hasSyncToggleObjects)
+						roSyncToggleObjects.serializedProperty.InsertArrayElementAtIndex(0);
+					else
+						roSyncToggleObjects.serializedProperty.ClearArray();
+				}
+
+				if (hasSyncToggleObjects)
+				{
+					GUILayout.Space(-2);
+					roSyncToggleObjects.DoLayoutList();
 				}
 			}
 
@@ -345,7 +478,11 @@ namespace Mobcast.Coffee.Toggles
 			EditorGUILayout.BeginVertical(styleInner, GUILayout.MinHeight(1f));
 			{
 				//アクション内容を全件表示.
-				bool drawTarget = current.toggleProperties.Count != 0 || spActions.arraySize != 0 || spGroupToggles.arraySize != 0 || spActivations.arraySize != 0;
+				bool drawTarget = current.toggleProperties.Count != 0 
+				                  || spActions.arraySize != 0 
+				                  || spGroupToggles.arraySize != 0 
+				                  || spActivations.arraySize != 0 
+				                  || spUnActivations.arraySize != 0;
 				for (int i = 0; i < current.count; i++)
 				{
 					//エレメントタイトル.
@@ -376,7 +513,7 @@ namespace Mobcast.Coffee.Toggles
 			// Save style property from target behavior.
 			using (var cc = new EditorGUI.DisabledGroupScope(!current || ValueType.Index < current.valueType))
 			{
-				if (GUILayout.Button(new GUIContent("Save"), EditorStyles.toolbarButton))
+				if (GUILayout.Button(new GUIContent("保存"), EditorStyles.toolbarButton))
 				{
 					foreach (var property in current.toggleProperties)
 					{
@@ -385,7 +522,7 @@ namespace Mobcast.Coffee.Toggles
 					}
 				}
 
-				if (GUILayout.Button(new GUIContent("Load"), EditorStyles.toolbarButton))
+				if (GUILayout.Button(new GUIContent("加载"), EditorStyles.toolbarButton))
 				{
 					ResetToggleValue();
 				}
@@ -399,7 +536,7 @@ namespace Mobcast.Coffee.Toggles
 				PropertyEditor.Bake(current.toggleProperties);
 			}
 
-			if (GUILayout.Button("Add Property", EditorStyles.toolbarPopup))
+			if (GUILayout.Button("添加属性", EditorStyles.toolbarPopup))
 			{
 				var menu = PropertyEditor.CreateTargetMenu(current, current.toggleProperties, current.count);
 				AppendAvailableOptionToMenu(menu).ShowAsContext();
@@ -407,7 +544,7 @@ namespace Mobcast.Coffee.Toggles
 
 
 			//自動構築ボタン.
-			EditorGUI.BeginDisabledGroup(spGroupToggles.arraySize == 0 && spActivations.arraySize == 0);
+			EditorGUI.BeginDisabledGroup(spGroupToggles.arraySize == 0 && spActivations.arraySize == 0 && spUnActivations.arraySize == 0 );
 			if (GUILayout.Button(contentHierarchy, EditorStyles.toolbarButton))
 			{
 				int count = current.count;
@@ -430,7 +567,16 @@ namespace Mobcast.Coffee.Toggles
 						children.Aggregate(new StringBuilder(), (a, b) => a.AppendFormat(" - {0}\n", b.name))
 					);
 				}
-
+				
+				if (0 < spUnActivations.arraySize)
+				{
+					count = Mathf.Max(count, children.Count);
+					sb.AppendFormat("\n{0} GameObjects for 'Set UnActivation' :\n{1}",
+						children.Count,
+						children.Aggregate(new StringBuilder(), (a, b) => a.AppendFormat(" - {0}\n", b.name))
+					);
+				}
+				
 				if (0 < spGroupToggles.arraySize)
 				{
 					count = Mathf.Max(count, childToggles.Count);
@@ -447,15 +593,198 @@ namespace Mobcast.Coffee.Toggles
 
 					for (int i = 0; i < Mathf.Min(spGroupToggles.arraySize, childToggles.Count); i++)
 						spGroupToggles.GetArrayElementAtIndex(i).objectReferenceValue = childToggles[i];
-
-					for (int i = 0; i < Mathf.Min(spActivations.arraySize, children.Count); i++)
-						spActivations.GetArrayElementAtIndex(i).objectReferenceValue = children[i].gameObject;
 				}
 			}
 			EditorGUI.EndDisabledGroup();
 
 			EditorGUILayout.EndHorizontal();
 			GUI.changed = changed;
+		}
+		
+		void DrawExActiveObjects()
+		{
+			bool hasExActiveObjects = current.hasExActiveObjects; 
+			bool isSupported = current.valueType == ValueType.Boolean || current.valueType == ValueType.Index;
+			if (!isSupported)
+			{
+				if (hasExActiveObjects)
+				{
+					EditorUtility.DisplayDialog("提示", $"激活列表不支持该类型:{current.valueType.ToString()}", "确认");
+				}
+				hasExActiveObjects = false;
+			}
+			
+			if (hasExActiveObjects)
+			{
+				EditorGUILayout.LabelField("激活列表");
+				roExActiveObjects.DoLayoutList();
+				
+				//在Inspector 窗口上创建区域，向区域拖拽资源对象，获取到拖拽到区域的对象
+				var eventType = Event.current.type;        
+				if (eventType == EventType.DragUpdated || eventType == EventType.DragPerform)
+				{
+					// Show a copy icon on the drag
+					DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+
+					if (eventType == EventType.DragPerform)
+					{
+						DragAndDrop.AcceptDrag();
+						foreach (var o in DragAndDrop.objectReferences)
+						{
+							GameObject tempGo = o as GameObject;
+							CompositeToggleGroupActiveData groupActiveData = new CompositeToggleGroupActiveData(tempGo, current.count);
+							current.AddExActiveDatas(groupActiveData);
+						}
+					}
+					Event.current.Use();
+				}
+			}
+			else
+			{
+				roExActiveObjects.serializedProperty.ClearArray();
+			}
+		}
+		
+		public Rect[] GetElementRects(Rect r)
+		{
+			Rect[] rects = new Rect[6];
+			
+			float x = r.x;
+			float y = r.y;
+			float height = r.height;
+			float space = 8;
+			float remainingWidth = r.width;
+			float delWidth = 30;
+			float idWidth = 40;
+			float contentWidth = Mathf.FloorToInt((remainingWidth - idWidth - delWidth - space * 4) / 3);
+			
+			int colIndex = 0;
+
+			//序号
+			rects[colIndex] = new Rect(x, y, idWidth, height);
+			colIndex++;
+			x += idWidth + space;
+			
+			//游戏物体
+			rects[colIndex] = new Rect(x, y, contentWidth, height);
+			colIndex++;
+			x += contentWidth + space;
+			
+			//状态
+			rects[colIndex] = new Rect(x, y, contentWidth, height);
+			colIndex++;
+			x += contentWidth + space;
+			
+			//状态值
+			rects[colIndex] = new Rect(x, y, contentWidth, height);
+			colIndex++;
+			x += contentWidth + space;
+			
+			//删除
+			rects[colIndex] = new Rect(x, y, delWidth, height);
+			return rects;
+		}
+
+		private void HeaderCallback(Rect rect)
+		{
+			rect.xMin += 14; // 忽略拖拽按钮的宽度
+			
+			Rect[] rects = GetElementRects(rect);
+			GUI.Label(rects[0], "序号", EditorStyles.label);
+			GUI.Label(rects[1], "游戏物体", EditorStyles.label);
+			GUI.Label(rects[2], "状态", EditorStyles.label);
+			GUI.Label(rects[3], "状态值", EditorStyles.label);
+			GUI.Label(rects[4], "删除", EditorStyles.label);
+		}
+		
+		private List<string> values = new List<string>();
+		private bool IsRepeat(GameObject go)
+		{
+			if (go == null)
+			{
+				return false;
+			}
+			
+			int count = 0;
+			for (int i = 0; i < current.ExActiveDatas.Count; i++)
+			{
+				var elementData = current.ExActiveDatas[i];
+				if (elementData.gameObject == go)
+				{
+					count++;
+				}
+			}
+			return count > 1;
+		}
+		
+		public void ElementCallback(Rect rect, int index, bool isActive, bool isFocused)
+		{
+			if (index >= roExActiveObjects.serializedProperty.arraySize)
+			{
+				return;
+			}
+			
+			var objTitle = new GUIContent("");
+			var element = roExActiveObjects.serializedProperty.GetArrayElementAtIndex(index);
+
+			GUI.backgroundColor = Color.white;
+			if (element.FindPropertyRelative("gameObject") != null)
+			{
+				GameObject eleGameObject = element.FindPropertyRelative("gameObject").objectReferenceValue as GameObject;
+				if (IsRepeat(eleGameObject))
+				{
+					GUI.backgroundColor = Color.red;
+				}
+			}
+
+			Rect[] rects = GetElementRects(rect);
+			
+			//序号
+			GUI.Label(rects[0], index.ToString());
+			
+			//游戏物体
+			EditorGUI.PropertyField(rects[1], element.FindPropertyRelative("gameObject"), objTitle);
+			
+			element.FindPropertyRelative("count").intValue = current.count;
+			
+			//状态
+			values.Clear();
+			List<string> commoments = current.GetComments();
+			for (int i = 0; i < current.count; i++)
+			{
+				if (commoments[i].Equals("Comment...") || string.IsNullOrEmpty(commoments[i]))
+				{
+					values.Add(current.valueType.ToString() + " " + i);    
+				}
+				else
+				{
+					values.Add(commoments[i]);
+				}
+			}
+			int stateValue = element.FindPropertyRelative("stateValue").intValue;
+			element.FindPropertyRelative("stateValue").intValue = EditorGUI.MaskField(rects[2], stateValue, values.ToArray());
+
+			//状态值
+			int[] stateValues = CompositeUtil.CalculationState(stateValue, current.count);
+			string retState = "";
+			for (int i = 0; i < stateValues.Length; i++)
+			{
+				if (stateValues[i] == 1)
+				{
+					retState += (retState.Length > 0 ? "," : "") + i;	
+				}
+			}
+			if (string.IsNullOrEmpty(retState))
+			{
+				retState = "无";
+			}
+			GUI.Label(rects[3], retState);
+
+			//删除
+			if (GUI.Button(rects[4], "×"))
+			{
+				roExActiveObjects.serializedProperty.DeleteArrayElementAtIndex(index);
+			};
 		}
 
 		/// <summary>
@@ -627,7 +956,7 @@ namespace Mobcast.Coffee.Toggles
 
 		void DrawTargetIndex(int index)
 		{
-			GUILayout.Space(-4);
+			GUILayout.Space(5);
 			EditorGUILayout.BeginVertical("helpbox");
 
 			if (!serializedObject.isEditingMultipleObjects)
@@ -678,7 +1007,10 @@ namespace Mobcast.Coffee.Toggles
 			// Draw activation.
 			if (index < spActivations.arraySize)
 				EditorGUILayout.PropertyField(spActivations.GetArrayElementAtIndex(index), contentActivation);
-
+			
+			if (index < spUnActivations.arraySize)
+				EditorGUILayout.PropertyField(spUnActivations.GetArrayElementAtIndex(index), contentUnActivation);
+			
 			EditorGUILayout.EndVertical();
 		}
 
@@ -691,7 +1023,9 @@ namespace Mobcast.Coffee.Toggles
 			menu.AddItem(contentAction, 0 < spActions.arraySize, () => SwitchActivate(spActions));
 			menu.AddItem(contentGroup, 0 < spGroupToggles.arraySize, () => SwitchActivate(spGroupToggles));
 			menu.AddItem(contentActivation, 0 < spActivations.arraySize, () => SwitchActivate(spActivations));
-
+			menu.AddItem(contentUnActivation, 0 < spUnActivations.arraySize, () => SwitchActivate(spUnActivations));
+			menu.AddItem(contentActiveDatasVation, current.hasExActiveObjects, () => SwitchActivate(spExActiveDatas));
+			
 			var ev = current.onValueChanged;
 			menu.AddItem(contentOnValueChanged, ev.GetPersistentEventCount() != 0,
 				() =>
@@ -710,16 +1044,30 @@ namespace Mobcast.Coffee.Toggles
 
 		void SwitchActivate(SerializedProperty sp)
 		{
-			if (0 < sp.arraySize)
+			if (sp == spExActiveDatas)
 			{
-				while (0 < sp.arraySize)
-					sp.DeleteArrayElementAtIndex(0);
+				current.hasExActiveObjects = !current.hasExActiveObjects;
+				bool isSupported = current.valueType == ValueType.Boolean || current.valueType == ValueType.Index;
+				if (!isSupported)
+				{
+					EditorUtility.DisplayDialog("提示", $"激活列表不支持该类型:{current.valueType.ToString()}", "确认");
+					current.hasExActiveObjects = false;
+				}
 			}
 			else
 			{
-				while (sp.arraySize < current.count)
-					sp.InsertArrayElementAtIndex(sp.arraySize);
+				if (0 < sp.arraySize)
+				{
+					while (0 < sp.arraySize)
+						sp.DeleteArrayElementAtIndex(0);
+				}
+				else
+				{
+					while (sp.arraySize < current.count)
+						sp.InsertArrayElementAtIndex(sp.arraySize);
+				}
 			}
+			
 			sp.serializedObject.ApplyModifiedProperties();
 		}
 	}

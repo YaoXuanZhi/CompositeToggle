@@ -40,7 +40,7 @@ namespace Mobcast.Coffee.Toggles
 			}
 		}
 
-		[SerializeField] bool m_IgnoreParent = false;
+		[SerializeField] bool m_IgnoreParent = true;
 
 		//==== ▼ Unityコールバック ▼ ====
 		protected virtual void Awake()

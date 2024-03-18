@@ -229,7 +229,7 @@ namespace Mobcast.Coffee.Toggles
 
 		public void OnBeforeSerialize()
 		{
-			if (!Application.isPlaying && parameterList != null)
+			if (parameterList != null)
 				m_ParameterListJson = (parameterList is ObjectParameterList) ? "" : JsonUtility.ToJson(parameterList);
 
 			if (string.IsNullOrEmpty(m_MethodId))

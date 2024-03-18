@@ -81,7 +81,7 @@ namespace Mobcast.Coffee.Toggles
 			},
 			{ typeof(Enum), (label, obj, type) => 
 				Convert.ToInt32(type.IsDefined(typeof(FlagsAttribute), true)
-					? EditorGUILayout.EnumMaskField(label, (Enum)Enum.ToObject(type, obj))
+					? EditorGUILayout.EnumFlagsField(label, (Enum)Enum.ToObject(type, obj))
 					: EditorGUILayout.EnumPopup(label, (Enum)Enum.ToObject(type, obj)))
 			},
 			{ typeof(object), (label, obj, type) =>
