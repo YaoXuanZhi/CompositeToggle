@@ -59,7 +59,7 @@ namespace Mobcast.Coffee.Toggles
 	/// Composite toggle.
 	/// <see cref="https://www.fairygui.com/docs/editor/controller"/>
 	/// </summary>
-	[ExecuteInEditMode]
+	[ExecuteAlways]
 	[AddComponentMenu("YIUI/控制器/复合开关 【CompositeToggle】")]
 	public class CompositeToggle : ParentChildRelatable<CompositeToggle>, ISerializationCallbackReceiver
 	{
@@ -328,25 +328,15 @@ namespace Mobcast.Coffee.Toggles
 		#endregion
 
 		//==== ▼ Unityコールバック ▼ ====
-
-		/// <summary>
-		/// Awake this instance.
-		/// </summary>
-		protected override void Awake()
+		private void Start()
 		{
-			base.Awake();
-
 			Reflesh();
 
 			forceNotifyNext = m_ResetValueOnAwake;
 			maskValue = maskValue;
 			
-#if UNITY_EDITOR
 			RefreshExToggles();
-#endif
 		}
-		
-#if UNITY_EDITOR
 
 		private void RefreshExToggles()
 		{
@@ -368,7 +358,6 @@ namespace Mobcast.Coffee.Toggles
 		{
 			RefreshExToggles();
 		}
-#endif	
 
 		/// <summary>
 		/// Gets or sets a value indicating whether this <see cref="Mobcast.Coffee.Toggles.CompositeToggle"/> force notify next.
@@ -557,6 +546,7 @@ namespace Mobcast.Coffee.Toggles
 #if UNITY_EDITOR
 			if (!inSerialization)
 				UnityEditor.EditorUtility.SetDirty(this);
+#endif
 
 			if (lastCount != m_Count)
 			{
@@ -564,7 +554,6 @@ namespace Mobcast.Coffee.Toggles
 			}
 
 			lastCount = m_Count;
-#endif
 		}
 
 		/// <summary>
@@ -737,12 +726,10 @@ namespace Mobcast.Coffee.Toggles
 		{
 			base.OnDestroy();
 
-#if UNITY_EDITOR
 			for (int i = ReferenceExToggles.Count -1; i >= 0; i--)
 			{
 				ReferenceExToggles[i].Remove(this);
 			}
-#endif
 		}
 	}
 }

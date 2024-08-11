@@ -96,17 +96,14 @@ namespace Mobcast.Coffee.Toggles
                     continue;
                 }
                 toggleData.toggle.onRefreshEvent = OnRefresh;
-#if UNITY_EDITOR
                 if (!toggleData.toggle.ReferenceExToggles.Contains(this))
                 {
                     toggleData.toggle.ReferenceExToggles.Add(this);
                 }        
-#endif
             }
             Refresh();
         }
 
-#if UNITY_EDITOR
         public void Remove(CompositeToggle toggle)
         {
             int i;
@@ -146,6 +143,7 @@ namespace Mobcast.Coffee.Toggles
 
         private void Save()
         {
+#if UNITY_EDITOR
             UnityEditor.SerializedObject serializedObject = new UnityEditor.SerializedObject(this);
             //根据PropertyPath读取prefab文件中的数据
             var dataProperty = serializedObject.FindProperty("data");
@@ -153,8 +151,8 @@ namespace Mobcast.Coffee.Toggles
             UnityEditor.EditorUtility.SetDirty(this);
             serializedObject.ApplyModifiedProperties();
             serializedObject.UpdateIfRequiredOrScript();
-        }
 #endif
+        }
         
         public void OnRefresh(CompositeToggle toggle)
         {
@@ -330,7 +328,6 @@ namespace Mobcast.Coffee.Toggles
             }
             tmpList.Clear();
             events.Clear();
-#if UNITY_EDITOR
             for (int i = 0; i < data.Count; i++)
             {
                 if (data[i].toggle == null)
@@ -339,7 +336,6 @@ namespace Mobcast.Coffee.Toggles
                 }
                 data[i].toggle.ReferenceExToggles.Remove(this);
             }
-#endif
         }
     }
 }
