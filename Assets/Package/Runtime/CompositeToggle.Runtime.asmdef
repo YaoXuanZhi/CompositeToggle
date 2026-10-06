@@ -1,7 +1,7 @@
-﻿{
+{
     "name": "CompositeToggle.Runtime",
     "rootNamespace": "",
-    "references": [],
+    "references": ["Unity.ugui"],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

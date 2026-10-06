@@ -13,7 +13,7 @@ namespace Mobcast.Coffee.Toggles
 	/// <summary>Authors real, inspectable scene bindings; no demo-only runtime animation engine.</summary>
 	public static class TweenDemoSceneBuilder
 	{
-		public const string ScenePath = "Assets/Mobcast/Coffee/CompositeToggle/Demo/Demo.unity";
+		public const string ScenePath = "Assets/Scenes/Demo.unity";
 		public const string RootPath = "Canvas/Scroll View/Viewport/Vertical Layout/Tween Playground";
 		static readonly Color CardColor = new Color(0.12f, 0.22f, 0.36f);
 		static readonly Color StageColor = new Color(0.08f, 0.15f, 0.25f);

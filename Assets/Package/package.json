@@ -1,0 +1,12 @@
+{
+  "name": "com.coffee.composite-toggle",
+  "version": "1.0.0",
+  "displayName": "Composite Toggle",
+  "description": "Composite UI toggles with reusable styles and interruptible property tweens.",
+  "unity": "6000.0",
+  "license": "MIT",
+  "author": { "name": "Coffee" },
+  "dependencies": {
+    "com.unity.ugui": "2.0.0"
+  }
+}

@@ -15,7 +15,7 @@ Tween 与延迟隐藏均默认关闭，旧资源不需要迁移。配置以每�
 
 ## Demo 场景示例
 
-打开 `Assets/Mobcast/Coffee/CompositeToggle/Demo/Demo.unity` 并进入 PlayMode。滚动页顶部新增 **Composite Toggle / Tween**，原有示例保留在其下方。
+打开 `Assets/Scenes/Demo.unity` 并进入 PlayMode。滚动页顶部新增 **Composite Toggle / Tween**，原有示例保留在其下方。
 
 | 示例 | 操作 | 展示能力 |
 |---|---|---|

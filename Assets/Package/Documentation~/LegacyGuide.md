@@ -1,11 +1,13 @@
+> Historical guide: the Unity 5.3 requirement below describes the original release, not this package. This development project targets Unity 6000.0.44f1 with uGUI 2.0.
+
 CompositeToggle & StyleSystem
 ===
 
 ## Overview
 
-CompositeToggle & StyleSystem are components that manage snapshots of properties.  
-They supports every properties including Image's Sprite, Graphic's Color, Text's text, GameObject's SetActive, etc...  
-Set values to properties you need, at same time, without other script.  
+CompositeToggle & StyleSystem are components that manage snapshots of properties.
+They supports every properties including Image's Sprite, Graphic's Color, Text's text, GameObject's SetActive, etc...
+Set values to properties you need, at same time, without other script.
 
 
 
@@ -29,18 +31,18 @@ Set values to properties you need, at same time, without other script.
 
 ## How to contorol component's properties in Unity?
 
-In Unity, how to control Images and Text components at the same time?  
-How to control the properties, such as sprite, text, color or fontSize?  
-It's common case in game development.  
+In Unity, how to control Images and Text components at the same time?
+How to control the properties, such as sprite, text, color or fontSize?
+It's common case in game development.
 
 ![compositetoggle_switch](https://user-images.githubusercontent.com/12690315/27722542-4a142646-5da3-11e7-825e-a82a7b074ec8.png)
 
-Do you use UnityEvent? Unfortunately, structures such as Color are not supported.  
+Do you use UnityEvent? Unfortunately, structures such as Color are not supported.
 So, we need a script as following to control the properties.
 
-The script controls 'state (On / Off)' and 'property (sprite etc.)'.  
-Therefore, as the state or properties increase, we need to add a script.  
-Considering work bottleneck and maintainability, it is not good.  
+The script controls 'state (On / Off)' and 'property (sprite etc.)'.
+Therefore, as the state or properties increase, we need to add a script.
+Considering work bottleneck and maintainability, it is not good.
 
 ```cs
 [SerializeField] Sprite sptireOn;
@@ -70,8 +72,8 @@ void SwitchOff()
 
 ## CompositeToggle
 
-CompositeToggle implemented to separate 'state' and 'property'.  
-The state is defined by a script, and the property is defined by a scene or a prefab.  
+CompositeToggle implemented to separate 'state' and 'property'.
+The state is defined by a script, and the property is defined by a scene or a prefab.
 The script should only turn the toggle on or off. Yes, it is very simple.
 
 ![compositetoggle_property](https://user-images.githubusercontent.com/12690315/27763631-d0d5a2a8-5ec1-11e7-8c3b-20840790858e.png)
@@ -84,8 +86,8 @@ void SetToggleValue(bool isOn)
 }
 ```
 
-CompositeToggle manage snapshots of properties.  
-Set values to properties you need, at same time, without other script.  
+CompositeToggle manage snapshots of properties.
+Set values to properties you need, at same time, without other script.
 
 ![compositetoggle_selectproperty](https://user-images.githubusercontent.com/12690315/27722541-4a0ec160-5da3-11e7-99ff-c74df150eb94.png)
 
@@ -93,9 +95,9 @@ Set values to properties you need, at same time, without other script.
 
 ## StyleSystem
 
-StyleSystem collectively manages the properties of Component and separates layout and design like CSS.  
-A style have some properties you need, and can be referred to by multiple GameObjects.  
-When the properties of the style are changed, they are immediately applied to the referencing GameObjects.  
+StyleSystem collectively manages the properties of Component and separates layout and design like CSS.
+A style have some properties you need, and can be referred to by multiple GameObjects.
+When the properties of the style are changed, they are immediately applied to the referencing GameObjects.
 
 ![stylesystem_inspector](https://user-images.githubusercontent.com/12690315/27722545-4a202946-5da3-11e7-975d-50898d4de3b8.png)
 
@@ -107,19 +109,19 @@ In addition, styles can apply at runtime :)
 
 ## Bake Properties To Improve Performance
 
-CompositeToggle internally uses reflection.  
-Reflection is slow? -Yes, that's right.  
-You can avoid reflection by baking the property to the script.  
-Bake the properties from the Style or StyleAsset inspector.  
+CompositeToggle internally uses reflection.
+Reflection is slow? -Yes, that's right.
+You can avoid reflection by baking the property to the script.
+Bake the properties from the Style or StyleAsset inspector.
 
 ![image](https://user-images.githubusercontent.com/12690315/28655700-8b2aec10-72d8-11e7-9416-47fd940c3b1f.png)
 
 ## Screenshot
 
-* Tabs and views  
+* Tabs and views
 ![compositetoggle_tabs](https://user-images.githubusercontent.com/12690315/27722543-4a14e9dc-5da3-11e7-993a-bf51adc8da70.gif)
 
-* Indicator  
+* Indicator
 ![compositetoggle_indicator](https://user-images.githubusercontent.com/12690315/27722539-49ebfedc-5da3-11e7-8af5-45deab6d1166.gif)
 
 

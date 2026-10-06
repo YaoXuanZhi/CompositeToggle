@@ -1,23 +1,31 @@
-﻿using UnityEditor;
+using UnityEditor;
 
 namespace Mobcast.Coffee.Toggles
 {
+	/// <summary>Project-only packaging tools; never exports implicitly on reload.</summary>
 	public static class ExportPackage
 	{
-		const string kPackageName = "CompositeToggle.unitypackage";
-		static readonly string[] kAssetPathes = {
-			"Assets/Mobcast/Coffee/CompositeToggle",
-		};
+		[MenuItem("Export Package/CompositeToggle.unitypackage")]
+		public static void ExportPlugin()
+		{
+			Export("CompositeToggle.unitypackage", new[] { "Assets/Package" });
+		}
 
-		[MenuItem ("Export Package/" + kPackageName)]
-		[InitializeOnLoadMethod]
-		static void Export ()
+		[MenuItem("Export Package/CompositeToggle with Demo")]
+		public static void ExportWithDemo()
+		{
+			Export("CompositeToggle-WithDemo.unitypackage", new[] {
+				"Assets/Package", "Assets/Scenes", "Assets/Scripts", "Assets/Content",
+				"Assets/Editor/TweenDemoSceneBuilder.cs"
+			});
+		}
+
+		static void Export(string fileName, string[] paths)
 		{
 			if (EditorApplication.isPlayingOrWillChangePlaymode)
 				return;
-			
-			AssetDatabase.ExportPackage (kAssetPathes, kPackageName, ExportPackageOptions.Recurse | ExportPackageOptions.Default);
-			UnityEngine.Debug.Log ("Export successfully : " + kPackageName);
+			AssetDatabase.ExportPackage(paths, fileName, ExportPackageOptions.Recurse);
+			UnityEngine.Debug.Log("Export successfully : " + fileName);
 		}
 	}
 }
