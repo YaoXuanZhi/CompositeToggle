@@ -1,0 +1,10 @@
+{
+    "name": "CompositeToggle.Tests.PlayMode",
+    "references": [
+        "CompositeToggle.Runtime"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "autoReferenced": false
+}

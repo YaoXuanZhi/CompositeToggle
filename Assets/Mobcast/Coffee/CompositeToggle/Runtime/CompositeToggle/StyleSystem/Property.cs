@@ -100,6 +100,42 @@ namespace Mobcast.Coffee.Toggles
 		[SerializeField]
 		string m_MethodId;
 
+		[SerializeField] PropertyTweenSettings m_Tween = new PropertyTweenSettings();
+		public PropertyTweenSettings tween { get { return m_Tween ?? (m_Tween = new PropertyTweenSettings()); } }
+
+		TweenPropertyAccessor m_TweenAccessor;
+		bool m_TweenAccessorChecked;
+		public bool supportsTween
+		{
+			get
+			{
+				if (!m_TweenAccessorChecked)
+				{
+					m_TweenAccessor = TweenPropertyAccessor.Create(methodInfo, parameterType);
+					m_TweenAccessorChecked = true;
+				}
+				return m_TweenAccessor != null;
+			}
+		}
+
+		internal void Apply(Object target, int index, CompositeToggle owner, bool animate)
+		{
+			if (hasParseError || !target || index < 0 || index >= parameterList.count) return;
+			var settings = tween;
+			if (!animate || !settings.enabled || !supportsTween || settings.duration <= 0
+				|| float.IsNaN(settings.duration) || float.IsInfinity(settings.duration))
+			{
+				Invoke(target, index);
+				return;
+			}
+			try { ToggleTweenManager.Start(owner, target, m_TweenAccessor, parameterList.GetObject(index), settings); }
+			catch (Exception exception)
+			{
+				Debug.LogException(exception, target);
+				Invoke(target, index);
+			}
+		}
+
 		BakedProperty.PropertySetter setter;
 
 		[SerializeField]
@@ -191,11 +227,13 @@ namespace Mobcast.Coffee.Toggles
 		/// <param name="index">Index.</param>
 		public void Invoke(Object methodTarget, int index)
 		{
-			if (hasParseError || !methodTarget || parameterList.count <= index)
+			if (hasParseError || !methodTarget || index < 0 || parameterList.count <= index)
 				return;
 
 			try
 			{
+				// Immediate writes (including Style) supersede any animation of the same property.
+				ToggleTweenManager.Cancel(methodTarget, methodInfo);
 				// If the baked property setter exists, invoke it.
 				if (setter != null)
 				{
@@ -238,6 +276,8 @@ namespace Mobcast.Coffee.Toggles
 
 		public void OnAfterDeserialize()
 		{
+			m_TweenAccessor = null;
+			m_TweenAccessorChecked = false;
 			m_MethodInfo = null;
 			m_MethodInfoChecked = false;
 			parameterList = null;

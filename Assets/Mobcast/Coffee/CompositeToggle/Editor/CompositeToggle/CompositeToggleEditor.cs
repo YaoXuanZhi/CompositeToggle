@@ -295,6 +295,7 @@ namespace Mobcast.Coffee.Toggles
 			OnDrawToggles();
 			
 			DrawExActiveObjects();
+			DrawTweenSettings();
 
 			//コールバック
 			if (current.onValueChanged.GetPersistentEventCount() != 0)
@@ -305,6 +306,55 @@ namespace Mobcast.Coffee.Toggles
 			EditorGUILayout.EndHorizontal();
 
 			serializedObject.ApplyModifiedProperties();
+		}
+
+		bool showTweenSettings;
+		void DrawTweenSettings()
+		{
+			showTweenSettings = EditorGUILayout.Foldout(showTweenSettings, "Tween 属性过渡", true);
+			if (!showTweenSettings) return;
+			using (new EditorGUILayout.VerticalScope("box"))
+			{
+				EditorGUILayout.PropertyField(serializedObject.FindProperty("m_DeferDeactivation"),
+					new GUIContent("等待退出动画后隐藏", "仅延迟本控制器发起的隐藏；等待目标及子节点的属性 Tween。默认关闭。"));
+				if (serializedObject.isEditingMultipleObjects)
+				{
+					EditorGUILayout.HelpBox("属性 Tween 请单独选择一个控制器配置。", MessageType.Info);
+					return;
+				}
+				bool stateSupportsProperties = current.valueType == ValueType.Boolean || current.valueType == ValueType.Index;
+				if (!stateSupportsProperties)
+					EditorGUILayout.HelpBox("Count / Flag 不应用属性状态，因此不会播放属性 Tween。", MessageType.Info);
+				var properties = serializedObject.FindProperty("m_ToggleProperties");
+				for (int i = 0; i < properties.arraySize && i < current.toggleProperties.Count; i++)
+				{
+					var property = current.toggleProperties[i];
+					if (property == null) continue;
+					var settings = properties.GetArrayElementAtIndex(i).FindPropertyRelative("m_Tween");
+					using (new EditorGUILayout.VerticalScope("helpbox"))
+					{
+						EditorGUILayout.LabelField(PropertyEditor.GetMethodPath(property, '.'), EditorStyles.boldLabel);
+						using (new EditorGUI.DisabledGroupScope(!stateSupportsProperties || !property.supportsTween))
+						{
+							var enabled = settings.FindPropertyRelative("enabled");
+							EditorGUILayout.PropertyField(enabled, new GUIContent("启用 Tween"));
+							if (enabled.boolValue)
+							{
+								EditorGUILayout.PropertyField(settings.FindPropertyRelative("duration"), new GUIContent("时长（秒）"));
+								EditorGUILayout.PropertyField(settings.FindPropertyRelative("delay"), new GUIContent("延迟（秒）"));
+								var ease = settings.FindPropertyRelative("ease");
+								EditorGUILayout.PropertyField(ease, new GUIContent("缓动"));
+								if (ease.enumValueIndex == (int)ToggleTweenEase.Custom)
+									EditorGUILayout.PropertyField(settings.FindPropertyRelative("curve"), new GUIContent("曲线"));
+								EditorGUILayout.PropertyField(settings.FindPropertyRelative("useUnscaledTime"), new GUIContent("使用未缩放时间"));
+							}
+						}
+						if (!property.supportsTween)
+							EditorGUILayout.HelpBox("仅支持可公开读写的 float、Vector2/3/4、Color 属性；普通方法和离散值立即应用。", MessageType.None);
+					}
+				}
+				EditorGUILayout.HelpBox("运行时从当前值过渡；编辑模式、首次初始化与重新启用直接应用终值。状态事件不会等待动画。", MessageType.None);
+			}
 		}
 
 		/// <summary>

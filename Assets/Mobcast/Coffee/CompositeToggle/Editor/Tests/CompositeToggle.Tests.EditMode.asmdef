@@ -1,0 +1,14 @@
+{
+    "name": "CompositeToggle.Tests.EditMode",
+    "references": [
+        "CompositeToggle.Runtime",
+        "Unity.ugui"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "autoReferenced": false
+}

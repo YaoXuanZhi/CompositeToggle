@@ -63,7 +63,6 @@ namespace Mobcast.Coffee.Toggles
 	[AddComponentMenu("YIUI/控制器/复合开关 【CompositeToggle】")]
 	public class CompositeToggle : ParentChildRelatable<CompositeToggle>, ISerializationCallbackReceiver
 	{
-		static readonly List<Component> s_Components = new List<Component>();
 
 
 		/// <summary>
@@ -169,6 +168,13 @@ namespace Mobcast.Coffee.Toggles
 		[SerializeField]
 		List<Property> m_ToggleProperties = new List<Property>();
 
+		[SerializeField] bool m_DeferDeactivation;
+		/// <summary>Keep an outgoing object visible until its own/descendant property tweens finish.</summary>
+		public bool deferDeactivation { get { return m_DeferDeactivation; } set { m_DeferDeactivation = value; } }
+		bool m_Started;
+		bool CanAnimate { get { return Application.isPlaying && m_Started && isActiveAndEnabled; } }
+
+
 		/// <summary>
 		/// The m activate objects.
 		/// </summary>
@@ -218,7 +224,7 @@ namespace Mobcast.Coffee.Toggles
 
 		/// <summary>トグルの値が変更された時のコールバック.</summary>
 		public OnValueChangeEvent onValueChanged{get {return m_OnValueChanged; }}
-		[SerializeField] OnValueChangeEvent m_OnValueChanged;
+		[SerializeField] OnValueChangeEvent m_OnValueChanged = new OnValueChangeEvent();
 
 		[HideInInspector]
 		public Action<CompositeToggle> onRefreshEvent;
@@ -333,9 +339,11 @@ namespace Mobcast.Coffee.Toggles
 			Reflesh();
 
 			forceNotifyNext = m_ResetValueOnAwake;
+			if (!forceNotifyNext) ApplyToggleProperties(indexValue, false, true);
 			maskValue = maskValue;
 			
 			RefreshExToggles();
+			m_Started = true;
 		}
 
 		private void RefreshExToggles()
@@ -357,6 +365,17 @@ namespace Mobcast.Coffee.Toggles
 		private void OnEnable()
 		{
 			RefreshExToggles();
+			if (m_Started) ApplyToggleProperties(indexValue, false, true);
+		}
+
+		private void OnDisable()
+		{
+			ToggleTweenManager.CancelOwner(this);
+		}
+
+		void ApplyActiveState(GameObject target, bool active)
+		{
+			ToggleTweenManager.SetActive(this, target, active, CanAnimate && m_DeferDeactivation);
 		}
 
 		/// <summary>
@@ -615,10 +634,10 @@ namespace Mobcast.Coffee.Toggles
 					m_GroupedToggles[i].booleanValue = flag;
 				
 				if (i < m_ActivateObjects.Count && m_ActivateObjects[i])
-					m_ActivateObjects[i].SetActive(flag);
+					ApplyActiveState(m_ActivateObjects[i], flag);
 				
 				if (i < m_UnActivateObjects.Count && m_UnActivateObjects[i])
-					m_UnActivateObjects[i].SetActive(!flag);
+					ApplyActiveState(m_UnActivateObjects[i], !flag);
 			}
 
 			for (int i = 0; i < m_ExActiveDatas.Count; i++)
@@ -630,7 +649,7 @@ namespace Mobcast.Coffee.Toggles
 					{
 						if (indexValue < groupActiveData.StateValues.Length && groupActiveData.gameObject != null)
 						{
-							groupActiveData.gameObject.SetActive(groupActiveData.StateValues[indexValue] == 1);
+							ApplyActiveState(groupActiveData.gameObject, groupActiveData.StateValues[indexValue] == 1);
 						}
 						break;
 					}
@@ -638,7 +657,7 @@ namespace Mobcast.Coffee.Toggles
 					{
 						if (indexValue < groupActiveData.StateValues.Length && groupActiveData.gameObject != null)
 						{
-							groupActiveData.gameObject.SetActive(groupActiveData.StateValues[indexValue] == 1);
+							ApplyActiveState(groupActiveData.gameObject, groupActiveData.StateValues[indexValue] == 1);
 						}
 						break;
 					}
@@ -671,20 +690,7 @@ namespace Mobcast.Coffee.Toggles
 			if (index < 0 || count <= index || ValueType.Index < valueType )
 				return;
 
-			s_Components.Clear();
-			GetComponents(s_Components);
-			for (int i = 0; i < m_ToggleProperties.Count; i++)
-			{
-				try
-				{
-					m_ToggleProperties[i].Invoke(s_Components.Find(x=>x.GetType() == m_ToggleProperties[i].methodTargetType), index);
-				}
-				catch (Exception ex)
-				{
-					Debug.LogException(ex);
-				}
-			}
-			s_Components.Clear();
+			ApplyToggleProperties(index, CanAnimate);
 
 			if (index < m_Actions.Count)
 			{
@@ -696,6 +702,20 @@ namespace Mobcast.Coffee.Toggles
 				{
 					Debug.LogException(ex);
 				}
+			}
+		}
+
+		void ApplyToggleProperties(int index, bool animate, bool tweenPropertiesOnly = false)
+		{
+			if (index < 0 || count <= index || ValueType.Index < valueType) return;
+			// Local list: property setters can re-enter another controller's application.
+			var components = new List<Component>();
+			GetComponents(components);
+			for (int i = 0; i < m_ToggleProperties.Count; i++)
+			{
+				var property = m_ToggleProperties[i];
+				if (property == null || (tweenPropertiesOnly && (!property.tween.enabled || !property.supportsTween))) continue;
+				property.Apply(components.Find(x => x && x.GetType() == property.methodTargetType), index, this, animate);
 			}
 		}
 
@@ -724,6 +744,7 @@ namespace Mobcast.Coffee.Toggles
 
 		protected override void OnDestroy()
 		{
+			ToggleTweenManager.CancelOwner(this);
 			base.OnDestroy();
 
 			for (int i = ReferenceExToggles.Count -1; i >= 0; i--)
